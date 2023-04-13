@@ -1,0 +1,101 @@
+stages:
+- build_STAGING
+- deploy_STAGING
+- tag_managment
+- build_prod
+- deploy_prod
+
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - tagname
+
+##############
+### STAGING ##
+##############
+build_STAGING:
+  image: docker:dind
+  stage: build_STAGING
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
+      when: always
+    - when: never
+  before_script:
+    - docker login nexus01.node02.infraplus.net:8082 -u docker -p docker123
+    - chmod 600 id_rsa
+  script:
+    - ./build_staging.sh
+  tags:
+    - node02
+
+deploy_STAGING:
+  image: docker:dind
+  stage: deploy_STAGING
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
+      when: on_success
+    - when: never
+  script:
+    - ./deploy_staging.sh
+  tags:
+    - node02
+
+###########
+### PROD ##
+###########
+tag_managment:
+  image: alpine:latest
+  stage: tag_managment
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+      when: always
+    - when: never
+  before_script:
+    - apk --no-cache add curl jq
+    - chmod 700 createtag.sh
+   # - mkdir tagname
+  script:
+    - MY_TAG="$(./createtag.sh)"
+    - echo $MY_TAG > tagname/MY_TAG
+  tags:
+    - node02
+
+build_prod:
+  image: docker:dind
+  stage: build_prod
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+      when: always
+    - when: never
+  before_script:
+    - docker login nexus01.node02.infraplus.net:8082 -u docker -p docker123
+    - chmod 600 id_rsa
+  script:
+    - ls -l tagname
+    - ./build.sh $(cat tagname/MY_TAG)
+  tags:
+    - node02
+
+deploy_prod:
+  image: docker:dind
+  stage: deploy_prod
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == "master"'
+      when: manual
+    - when: never
+  script:
+    - ./deploy.sh $(cat tagname/MY_TAG)
+  tags:
+    - node02
+

@@ -1,0 +1,47 @@
+version: '3.1'                
+services:                     
+  react-app:                  
+    image: nexus01.node02.infraplus.net:8082/react-app:STAGING
+    restart: unless-stopped   
+    stdin_open: true          
+    ports:                    
+      - "3000:3000"           
+    networks:
+      - mern-net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure   
+    domainname: winou.ovh 
+    hostname: winou  
+  api-server:                 
+    image: nexus01.node02.infraplus.net:8082/api-server:STAGING
+    restart: unless-stopped   
+    ports:                    
+      - "5000:5000"                  
+    depends_on:               
+      - mongo  
+    networks:
+      - mern-net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure  
+  mongo:                      
+    image: mongo:4.4-bionic   
+    ports:                    
+      - "27017:27017"              
+    volumes:                  
+      - mongo-data:/data/db   
+    networks:
+      - mern-net
+    deploy:
+      restart_policy:
+        condition: on-failure  
+networks:
+  mern-net:    
+    driver: overlay                        
+volumes:                      
+  mongo-data:                 
+    driver: local             
+                              
